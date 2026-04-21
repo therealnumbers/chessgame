@@ -1,8 +1,7 @@
 # this is the third time weve completley restated
 # lets go
-import re
 import random as rand
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Generator
 
 # First: we need a way to view the board and the pieces within
 # Zeroth: we need a way to represent pieces
@@ -33,29 +32,106 @@ class Piece:
         badType = n & Piece.TYPEMASK == Piece.TYPEMASK
         outsideScope = (n & Piece.COLORMASK) + (n & Piece.TYPEMASK) != n
         return badColor or badType or outsideScope
-    @staticmethod
-    def stringifyPiece(p:PieceInt):
-        if p == Piece.NONE: return "."
-        match p & Piece.TYPEMASK:
-            case Piece.PAWN: chars = "♙🨩" # Why is the black pawn stupid
-            case Piece.KNIGHT: chars = "♘♞"
-            case Piece.BISHOP: chars = "♗♝"
-            case Piece.ROOK: chars= "♖♜"
-            case Piece.QUEEN: chars = "♕♛"
-            case Piece.KING: chars = "♔♚"
-            case _: raise AssertionError("HOW")
+    
+    # Figure out if theres a way to make this symbol relation
+    # Without hardcoding it
 
-        index = 0 if p & Piece.COLORMASK == Piece.WHITE else 1
-        return chars[index]
+    PIECENUMBERS:Tuple[int,...] = (
+        WHITE | PAWN,
+        WHITE | KNIGHT,
+        WHITE | BISHOP,
+        WHITE | ROOK,
+        WHITE | QUEEN,
+        WHITE | KING,
+        BLACK | PAWN,
+        BLACK | KNIGHT,
+        BLACK | BISHOP,
+        BLACK | ROOK,
+        BLACK | QUEEN,
+        BLACK | KING,
+        NONE)
+    PIECESYMBOLS = tuple("♙♘♗♖♕♔🨩♞♝♜♛♚.")
+    PIECELETTERS = tuple("PNBRQKpnbrqkX")
+
+    @staticmethod
+    def pieceToSymbol(p:PieceInt,*,FEN = False) -> str:
+        index = Piece.PIECENUMBERS.index(p)
+        return Piece.PIECELETTERS[index] if FEN else Piece.PIECESYMBOLS[index]
+    
+    @staticmethod
+    def symbolToPiece(p:str) -> int:
+        if p in Piece.PIECESYMBOLS:
+            return Piece.PIECENUMBERS[Piece.PIECESYMBOLS.index(p)]
+        if p in Piece.PIECELETTERS:
+            return Piece.PIECENUMBERS[Piece.PIECELETTERS.index(p)]
+        raise ValueError(f"Invalid Char {p}")
 
 class Board:
     def __init__(self):
+        """The Board is just a list of pieces. Starts counting from the bottom left corner moving
+        right, going up when reaching the end of a rank."""
         self.board:list[PieceInt] = [Piece.NONE for _ in range(64)]
+    
+    
+    @staticmethod
+    def topDownIndex(square:int) -> int:
+        """Takes the top down index and convert it to the regular index
         
+        Board.topDownIndex(63) = 8 """
+        file = square % 8
+        rank = square // 8
+        return 8*(7-rank) + file
+            
     def __str__(self):
-        rows = [""]
-        for i in range(64):
-            if i % 8 == 0:
-                rows.insert(0,"")
-            rows[0] += Piece.stringifyPiece(self.board[i])
-        return "\n".join(rows)
+        pieces = ""
+        for square in range(64):
+            square = Board.topDownIndex(square)
+            pieces += Piece.pieceToSymbol(self.board[square]) + ("" if (square + 1) % 8 else "\n")
+        return pieces
+    
+
+    def saveFEN(self) -> str:
+        #TODO: Add support for extended FEN, information such as castling.
+        output = ""
+        run = 0
+        for square in range(64):
+            square = Board.topDownIndex(square)
+            if (square) % 8 == 0 and square != Board.topDownIndex(0):
+                output += "/"
+            if self.board[square] == Piece.NONE:
+                run += 1
+                if not ((square + 1) % 8):
+                    output += str(run)
+                    run  = 0
+                continue
+            if run != 0:
+                output += str(run)
+                run = 0
+            output += Piece.pieceToSymbol(self.board[square], FEN = True)
+
+        return output
+    def loadFen(self,FEN:str):
+        currentSquare = 0
+        for char in FEN:
+            if char == "/": continue
+            if char.isnumeric():
+                for _ in range(int(char)):
+                    self.board[Board.topDownIndex(currentSquare)] = Piece.NONE
+                    currentSquare += 1
+                continue
+            self.board[Board.topDownIndex(currentSquare)] = Piece.symbolToPiece(char)
+            currentSquare += 1
+    
+            
+if __name__ == '__main__':
+    import os
+    os.system('cls' if os.name == 'nt' else 'clear')
+    a = Board()
+    fen = "R1B4Q/pnPpr3/2PNr2q/p1bPP1p1/Rpbp1P2/3n2PP/3pPp1B/1KN1k3"
+    a.loadFen(fen)
+    try:
+        assert a.saveFEN() == fen
+    except AssertionError:
+        print(f"a.saveFEN(): {a.saveFEN()},\nActual Fen: {fen}")
+    
+    print(a)
