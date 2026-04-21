@@ -67,11 +67,16 @@ class Piece:
         raise ValueError(f"Invalid Char {p}")
 
 class Board:
+    FILENAMES = "abcdefgh"
+    RANKNAMES = "12345678"
     def __init__(self):
-        """The Board is just a list of pieces. Starts counting from the bottom left corner moving
-        right, going up when reaching the end of a rank."""
+        # The actual board is a list of PieceInts.
         self.board:list[PieceInt] = [Piece.NONE for _ in range(64)]
-    
+        self.whiteToMove = True
+        self.castlingRights = [True,True,True,True] # White kingside, White queenside, Black kingside, Black Queenside
+        self.enPassantSquare = -1
+        self.halfMoves = 0
+
     
     @staticmethod
     def topDownIndex(square:int) -> int:
@@ -81,38 +86,66 @@ class Board:
         file = square % 8
         rank = square // 8
         return 8*(7-rank) + file
+    
+    @staticmethod
+    def indexToName(index:int) -> str:
+        """Takes in a square and returns its coordinates. Bottom left is a1, top right is h8 """
+        if index < 0 or index >= 64:
+            return "-"
+        file = index % 8
+        rank = index // 8
+        return Board.FILENAMES[file] + Board.RANKNAMES[rank]
+    
+    @staticmethod
+    def nameToIndex(squareName):
+        if squareName == "-":
+            return -1
+        file = Board.FILENAMES.index(squareName[0])
+        rank = Board.RANKNAMES.index(squareName[1])
+        return (8 * rank) + file
+    
+
+        
             
     def __str__(self):
-        pieces = ""
+        position = ""
         for square in range(64):
             square = Board.topDownIndex(square)
-            pieces += Piece.pieceToSymbol(self.board[square]) + ("" if (square + 1) % 8 else "\n")
-        return pieces
+            position += Piece.pieceToSymbol(self.board[square]) + ("" if (square + 1) % 8 else "\n")
+        return position
     
 
     def saveFEN(self) -> str:
         #TODO: Add support for extended FEN, information such as castling.
-        output = ""
+        position = ""
         run = 0
         for square in range(64):
             square = Board.topDownIndex(square)
             if (square) % 8 == 0 and square != Board.topDownIndex(0):
-                output += "/"
+                position += "/"
             if self.board[square] == Piece.NONE:
                 run += 1
                 if not ((square + 1) % 8):
-                    output += str(run)
+                    position += str(run)
                     run  = 0
                 continue
             if run != 0:
-                output += str(run)
+                position += str(run)
                 run = 0
-            output += Piece.pieceToSymbol(self.board[square], FEN = True)
+            position += Piece.pieceToSymbol(self.board[square], FEN = True)
 
-        return output
+        turn = 'w' if self.whiteToMove else "b"
+        castle = ''.join(["KQkq"[i] for i in range(4) if self.castlingRights[i]])
+        if castle == '': castle = '-'
+        enPassant = Board.indexToName(self.enPassantSquare)
+        halfMoves = self.halfMoves
+
+        return f'{position} {turn} {castle} {enPassant} {halfMoves}'
+    
     def loadFen(self,FEN:str):
+        position, turn, castle, enPassant ,halfMoves = FEN.split(' ')
         currentSquare = 0
-        for char in FEN:
+        for char in position:
             if char == "/": continue
             if char.isnumeric():
                 for _ in range(int(char)):
@@ -121,17 +154,17 @@ class Board:
                 continue
             self.board[Board.topDownIndex(currentSquare)] = Piece.symbolToPiece(char)
             currentSquare += 1
+        self.whiteToMove = (turn == "w")
+        self.castlingRights = [(i in castle) for i in "KQkq"]
+        self.enPassantSquare = Board.nameToIndex(enPassant)
+        self.halfMoves = int(halfMoves)
     
             
 if __name__ == '__main__':
     import os
     os.system('cls' if os.name == 'nt' else 'clear')
+    fen = "8/2PK1NQB/qppP1PPB/1n2p3/P1r1RpPb/p2P1ppR/rP2Nkbp/2n5 w - - 0"
     a = Board()
-    fen = "R1B4Q/pnPpr3/2PNr2q/p1bPP1p1/Rpbp1P2/3n2PP/3pPp1B/1KN1k3"
     a.loadFen(fen)
-    try:
-        assert a.saveFEN() == fen
-    except AssertionError:
-        print(f"a.saveFEN(): {a.saveFEN()},\nActual Fen: {fen}")
-    
+    assert a.saveFEN() == fen, f"\noutput: {a.saveFEN()}\nactual: {fen}"
     print(a)
