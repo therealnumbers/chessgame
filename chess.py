@@ -2,10 +2,10 @@
 # lets go
 import random as rand
 from typing import Tuple, Optional, Generator
+from colorama import Fore,Back,Style
 
 # First: we need a way to view the board and the pieces within
 # Zeroth: we need a way to represent pieces
-# Lets try the bitboard approach
 
 # Any 5-bit integer can be a piece. The revelant consideration consists
 # of two parts: type and color
@@ -103,15 +103,23 @@ class Board:
         file = Board.FILENAMES.index(squareName[0])
         rank = Board.RANKNAMES.index(squareName[1])
         return (8 * rank) + file
-    
-
-        
-            
+ 
     def __str__(self):
         position = ""
         for square in range(64):
             square = Board.topDownIndex(square)
-            position += Piece.pieceToSymbol(self.board[square]) + ("" if (square + 1) % 8 else "\n")
+            if self.board[square] & Piece.COLORMASK == Piece.BLACK:
+                position += Fore.BLACK + Style.DIM
+            if self.board[square] & Piece.COLORMASK == Piece.WHITE:
+                position += Style.BRIGHT
+            position += Piece.pieceToSymbol(self.board[square])
+            position += Fore.WHITE + Style.RESET_ALL
+            if square % 8 == 7:
+                position += "\n"
+        if self.enPassantSquare != -1:
+            position += f"\nEn Passant Square: {Board.indexToName(self.enPassantSquare)}"
+        if any(self.castlingRights):
+            position += f"\n Catsle Rights: {''.join('KQkq'[i] + ', ' for i in range(4) if self.castlingRights[i])}"
         return position
     
 
@@ -159,11 +167,13 @@ class Board:
         self.enPassantSquare = Board.nameToIndex(enPassant)
         self.halfMoves = int(halfMoves)
     
+
+        
             
 if __name__ == '__main__':
     import os
     os.system('cls' if os.name == 'nt' else 'clear')
-    fen = "8/2PK1NQB/qppP1PPB/1n2p3/P1r1RpPb/p2P1ppR/rP2Nkbp/2n5 w - - 0"
+    fen = "8/2PK1NQB/qppP1PPB/1n2p3/P1r1RpPb/p2P1ppR/rP2Nkbp/2n5 w Kq e3 45"
     a = Board()
     a.loadFen(fen)
     assert a.saveFEN() == fen, f"\noutput: {a.saveFEN()}\nactual: {fen}"
