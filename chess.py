@@ -104,7 +104,7 @@ class Board:
 
     @staticmethod
     def squareToRankFile(index:int) -> Tuple[int,int]:
-        if 0 <= index < 63 : return (index % 8, index // 8)
+        if 0 <= index < 64 : return (index % 8, index // 8)
         raise ValueError(f"Invalid square index: {index}")
     @staticmethod
     def rankFileToSquare(rankFile:Tuple[int,int]) -> int:
